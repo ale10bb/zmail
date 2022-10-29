@@ -271,9 +271,19 @@ class SMTPServer(BaseServer):
 
     def stls(self):
         """Start TLS."""
-        self.server.ehlo()
-        self.server.starttls()
-        self.server.ehlo()
+        # python 3.10 增强了TLS的默认安全性，若邮件服务支持的TLS强度低，需要降低安全参数并重试
+        # https://github.com/python/cpython/issues/88164
+        # https://stackoverflow.com/questions/71006708/getting-sslv3-alert-handshake-failure-when-trying-to-connect-to-imap
+        try:
+            self.server.ehlo()
+            self.server.starttls()
+        except:
+            import ssl
+            ctx = ssl.create_default_context()
+            ctx.set_ciphers('DEFAULT')
+            self.server.connect(self.host, self.port)
+            self.server.ehlo()
+            self.server.starttls(context=ctx)
 
     # Methods
     def send(self, recipients: Iterable[str], mail: Mail,
@@ -334,7 +344,18 @@ class POPServer(BaseServer):
         self._login = False
 
     def stls(self):
-        self.server.stls()
+        """Start TLS."""
+        # python 3.10 增强了TLS的默认安全性，若邮件服务支持的TLS强度低，需要降低安全参数并重试
+        # https://github.com/python/cpython/issues/88164
+        # https://stackoverflow.com/questions/71006708/getting-sslv3-alert-handshake-failure-when-trying-to-connect-to-imap
+        try:
+            self.server.starttls()
+        except:
+            import ssl
+            ctx = ssl.create_default_context()
+            ctx.set_ciphers('DEFAULT')
+            self.server.connect(self.host, self.port)
+            self.server.starttls(context=ctx)
 
     # Methods
 
