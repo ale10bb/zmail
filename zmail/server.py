@@ -237,6 +237,11 @@ class SMTPServer(BaseServer):
         if self.tls:
             self.stls()
 
+        # 服务器启用登录失败处理的情况下，一次验证失败即断开连接。指定登录方式可解决
+        self.server.ehlo()
+        if self.host == 'shtec.org.cn':
+            self.server.esmtp_features['auth'] = 'LOGIN'
+
         self.server.login(self.username, self.password)
 
         self._login = True
