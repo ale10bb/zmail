@@ -72,7 +72,19 @@ def parse_header_value(bvalue, encodings) -> str or None:
     if value is not None:
         decoded_value = ''
         for _value, _charset in decode_header(value):
-            if _charset is not None:
+            # 2023.02.15测试结果：
+            # foxmail、outlook默认用GB2312字符集，碰到GB2312不存在的冷僻字时，
+            # 将自动扩展使用GBK或GB18030，但依然会注明其编码方式为GB2312，
+            # 导致email库自动解析失败
+            # 例如：
+            # "转发: 飏飏飏羊洋阳" => "=?gb2312?B?16q3ojog73Lvcu9y0fLR89H0?="
+            # 因此使用大力出奇迹的方式，直接使用GB18030解析（向下兼容）
+            if _charset == 'gb2312' or _charset == 'gbk':
+                try:
+                    decoded_value += _value.decode('gb18030')
+                except UnicodeDecodeError:
+                    break
+            elif _charset is not None:
                 try:
                     decoded_value += _value.decode(_charset)
                 except UnicodeDecodeError:
@@ -130,7 +142,12 @@ def _get_sub_charset(raw_headers: list) -> list:
     for k, _ in raw_headers:
         if b'X-QQ' in k:
             return ['gbk']
-    return []
+    # 2023.02.15测试结果：
+    # foxmail、outlook默认用GB2312字符集，碰到GB2312不存在的冷僻字时，
+    # 将自动扩展使用GBK或GB18030，但依然会注明其编码方式为GB2312，
+    # 导致_decode_one_part_body自动解析失败。
+    # 因此使用大力出奇迹的方式，在sub_charset中强行附加GB18030解析
+    return ['gb18030']
 
 
 def parse_headers(lines: List[bytes], debug=False, log=None):
